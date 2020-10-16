@@ -2,13 +2,40 @@
 from __future__ import unicode_literals
 
 from django.shortcuts import render, get_object_or_404
+from django.views.generic import ListView
+
 from blog.models import Post
+from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 
 
 # Create your views here.
-def post_list(request):
-    posts = Post.published.all()  # pobranie wszystkich postów gdzie status='published'
-    return render(request, 'blog/post/list.html', {'posts': posts})
+class PostListView(ListView):
+    queryset = Post.published.all()
+    context_object_name = 'posts'
+    paginate_by = 3
+    template_name = 'blog/post/list.html'
+    print("context_object_name:", context_object_name)
+    print("context_object_name:", type(context_object_name))
+
+
+# def post_list(request):
+#     object_list = Post.published.all()  # pobranie wszystkich postów gdzie status='published'
+#     paginator = Paginator(object_list, 3)  # trzy posty na każdej stronie
+#     page = request.GET.get('page')
+#     try:
+#         posts = paginator.page(page)
+#     except PageNotAnInteger:
+#         # jeżeli zmienna page nie jest liczbą całkowitą
+#         # wówczas pobierana jest pierwsza strona wyników.
+#         posts = paginator.page(1)
+#     except EmptyPage:
+#         # Jeżeli zmienna page ma wartość większą niż numer ostatniej strony
+#         # wyników, wtedy pobierana jest ostatnia strona wyników
+#         posts = paginator.page(paginator.num_pages)
+#     return render(request,
+#                   'blog/post/list.html',
+#                   {'page': page,
+#                    'posts': posts})
 
 
 def post_detail(request, year, month, day, post):
