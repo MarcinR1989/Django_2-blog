@@ -119,3 +119,7 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/1.11/howto/static-files/
 
 STATIC_URL = '/static/'
+
+# RUNSERVER TRZEBA ODPALAĆ Z PONIŻSZĄ KOMENDĄ \|/ \|/
+# python manage.py runserver --settings=Django_2_blog.local_settings
+# tak samo trzeba postępować przy migrowaniu
