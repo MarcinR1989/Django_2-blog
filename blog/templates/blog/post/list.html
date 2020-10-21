@@ -4,16 +4,20 @@
 
 {% block content %}
     <h1>My blog</h1>
+
+        {% if tag %}
+            <h2>Tagged posts: {{ tag.name }} </h2>
+        {% endif %}
+
         {% for post in posts %}
             <h2>
-                <a href="{{ post.get_absolute_url }}">
-                    {{ post.title }}
-                </a>
+                <a href="{{ post.get_absolute_url }}">{{ post.title }}</a>
             </h2>
+            {% include 'tags.html' with tags=tags %}
             <p class="date">
-                Publicated {{ post.publish }} by {{ post.author }}
+                Published {{ post.publish }} by {{ post.author }}
             </p>
             {{ post.body|truncatewords:30|linebreaks }}
         {% endfor %}
-    {% include "pagination.html" with page=page_obj %}
+    {% include "pagination.html" with page=posts %}
 {% endblock %}

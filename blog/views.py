@@ -1,11 +1,14 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
+from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.shortcuts import render, get_object_or_404
 from django.views.generic import ListView
 from .forms import EmailPostForm, CommentForm
 from .models import Post, Comment
 from django.core.mail import send_mail
+from taggit.models import Tag
+from django.db.models import Count
 
 
 # from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
@@ -17,28 +20,28 @@ class PostListView(ListView):
     context_object_name = 'posts'
     paginate_by = 3
     template_name = 'blog/post/list.html'
-    # print("context_object_name:", context_object_name)
-    # print("context_object_name:", type(context_object_name))
 
 
-# def post_list(request):...
-#     object_list = Post.published.all()  # pobranie wszystkich postów gdzie status='published'
-#     paginator = Paginator(object_list, 3)  # trzy posty na każdej stronie
-#     page = request.GET.get('page')
-#     try:
-#         posts = paginator.page(page)
-#     except PageNotAnInteger:
-#         # jeżeli zmienna page nie jest liczbą całkowitą
-#         # wówczas pobierana jest pierwsza strona wyników.
-#         posts = paginator.page(1)
-#     except EmptyPage:
-#         # Jeżeli zmienna page ma wartość większą niż numer ostatniej strony
-#         # wyników, wtedy pobierana jest ostatnia strona wyników
-#         posts = paginator.page(paginator.num_pages)
-#     return render(request,
-#                   'blog/post/list.html',
-#                   {'page': page,
-#                    'posts': posts})
+def post_list(request, tag_slug=None):
+    # pobranie wszystkich postów gdzie status='published'
+    object_list = Post.published.all()
+    tag = None
+
+    if tag_slug:
+        tag = get_object_or_404(Tag, slug=tag_slug)
+        object_list = object_list.filter(tags__in=[tag])
+    paginator = Paginator(object_list, 3)  # 3 posts on each page
+    page = request.GET.get('page')
+    try:
+        posts = paginator.page(page)
+    except PageNotAnInteger:
+        posts = paginator.page(1)
+    except EmptyPage:
+        # if variable page bigger than max page number
+        posts = paginator.page(paginator.num_pages)
+    return render(request, 'blog/post/list.html', {'page': page,
+                                                   'posts': posts,
+                                                   'tag': tag})
 
 
 def post_detail(request, year, month, day, post):
@@ -48,23 +51,37 @@ def post_detail(request, year, month, day, post):
                              publish__year=year,
                              publish__month=month,
                              publish__day=day)
+    comment_created = False
     # List of active comments for a given post
-    comments = post.comment_set.filter(active=True)  # TODO wg ksiązki powinno być 'comments = post.comments.filter(active=True)'
+    comments = post.comment_set.filter(active=True)
 
     if request.method == 'POST':
         # Comment has been published
-        comment_form = CommentForm(data=request.POST)  # TODO 'data=' do wyjebania ???
+        comment_form = CommentForm(request.POST)
         if comment_form.is_valid():
-            # Utworzenie obiektu Comment, ale jeszcze nie zapisuję go w bazie danych
+            # Utworzenie obiektu Comment, ale jeszcze
+            # nie zapisuję go w bazie danych
             new_comment = comment_form.save(commit=False)
             new_comment.post = post
             new_comment.save()
+            comment_created = True
     else:
         comment_form = CommentForm()
+
+    # Similar posts list
+    post_tags_ids = post.tags.values_list('id', flat=True)
+    similar_posts = Post.published.filter(tags__in=post_tags_ids) \
+                                  .exclude(id=post.id)
+    similar_posts = similar_posts.annotate(same_tags=Count('tags')) \
+                                 .order_by('-same_tags', '-publish')[:4]
+
     return render(request, 'blog/post/detail.html',
                   {'post': post,
                    'comments': comments,
-                   'comment_form': comment_form})
+                   'comment_form': comment_form,
+                   'comment_created': comment_created,
+                   'similar_posts': similar_posts,
+                   })
 
 
 def post_share(request, post_id):
@@ -74,10 +91,13 @@ def post_share(request, post_id):
     if request.method == 'POST':
         form = EmailPostForm(request.POST)
         if form.is_valid():
-            cd = form.cleaned_data  # Słownik zawierający pola formularza i ich wartości
+            # Słownik z polami formularza i ich wartości
+            cd = form.cleaned_data
             post_url = request.build_absolute_uri(post.get_absolute_url())
-            subject = f'{cd["name"]} ({cd["email"]}) encourages you to read {post.title}.'
-            message = f'Read post "{post.title}" on {post_url}\n\n Comment added by {cd["name"]}: {cd["comments"]}'
+            subject = f'{cd["name"]} ({cd["email"]}) encourages you ' \
+                      f'to read {post.title}.'
+            message = f'Read post "{post.title}" on {post_url}' \
+                      f'\n\n Comment added by {cd["name"]}: {cd["comments"]}'
             send_mail(subject, message, 'admin@myblog.com', [cd['to']])
             sent = True
     else:
