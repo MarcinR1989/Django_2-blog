@@ -1,4 +1,5 @@
 {% extends "blog/base.html" %}
+{%  load blog_tags %}
 
 {% block title %}{{ post.title }}{% endblock %}
 
@@ -25,7 +26,7 @@
     <p class="date">
     Published {{ post.publish }} by {{ post.author }}
     </p>
-    {{ post.body|linebreaks }}
+    {{ post.body|markdown }}
     {% include 'tags.html' with tags=tags %}
     <p>
         <a href="{% url "blog:post_share" post.id %}">
